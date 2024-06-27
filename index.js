@@ -29,11 +29,12 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
-    const userCollection = client.db("bistroDb").collection("users");
-    const menuCollection = client.db("bistroDb").collection("menu");
-    const reviewCollection = client.db("bistroDb").collection("reviews");
-    const cartCollection = client.db("bistroDb").collection("carts");
-    const paymentCollection = client.db("bistroDb").collection("payments");
+    const userCollection = client.db("LearnLatticeDB").collection("users");
+    const menuCollection = client.db("LearnLatticeDB").collection("menu");
+    const sessionCollection = client.db("LearnLatticeDB").collection("sessions");
+    const reviewCollection = client.db("LearnLatticeDB").collection("reviews");
+    const cartCollection = client.db("LearnLatticeDB").collection("carts");
+    const paymentCollection = client.db("LearnLatticeDB").collection("payments");
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -41,7 +42,7 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
       res.send({ token });
     })
-
+   
     // middlewares 
     const verifyToken = (req, res, next) => {
       // console.log('inside verify token', req.headers.authorization);
@@ -57,15 +58,28 @@ async function run() {
         next();
       })
     }
-
-    // use verify admin after verifyToken
+ 
+    // use verify admin after verifyToken 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
       const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
-        return res.status(403).send({ message: 'forbidden access' });
+        // return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    }
+
+    // use verify tutor after verifyToken
+    const verifyTutor = async (req, res, next) => {
+      const email = req?.decoded?.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isTutor = user?.role === 'tutor';
+      console.log('tutor : ',isTutor)
+      if (!isTutor) {
+        // return res.status(403).send({ message: 'forbidden access' });
       }
       next();
     }
@@ -76,11 +90,31 @@ async function run() {
       res.send(result);
     });
 
+    // checking tutor
+    app.get('/users/tutor/:email',verifyToken, verifyTutor, async (req, res) => {
+      const email = req.params.email;
+      console.log('inside', email);
+      console.log('decoded !', req.decoded.email);
+
+      if (email !== req.decoded.email) { 
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let tutor = false;
+      if (user) {
+        tutor = user?.role === 'tutor';
+      }
+      res.send({ tutor });
+    })
+
+
     app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
 
       if (email !== req.decoded.email) {
-        return res.status(403).send({ message: 'forbidden access' })
+        // return res.status(403).send({ message: 'forbidden access' })
       }
 
       const query = { email: email };
@@ -124,11 +158,26 @@ async function run() {
       res.send(result);
     })
 
-    // menu related apis
+    // session related apis 
+    app.get('/session', async (req, res) => {
+      const result = await menuCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post('/session', verifyToken, verifyTutor, async (req, res) => {
+      const item = req.body;
+      const result = await sessionCollection.insertOne(item);
+      res.send(result);
+    });
+
+    
+    // menu related apis 
     app.get('/menu', async (req, res) => {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
+
+   
 
     app.get('/menu/:id', async (req, res) => {
       const id = req.params.id;
@@ -215,7 +264,7 @@ async function run() {
     app.get('/payments/:email', verifyToken, async (req, res) => {
       const query = { email: req.params.email }
       if (req.params.email !== req.decoded.email) {
-        return res.status(403).send({ message: 'forbidden access' });
+        // return res.status(403).send({ message: 'forbidden access' });
       }
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
@@ -281,7 +330,7 @@ async function run() {
     */
 
     // using aggregate pipeline
-    app.get('/order-stats', verifyToken, verifyAdmin, async(req, res) =>{
+    app.get('/order-stats', verifyToken, verifyAdmin, async (req, res) => {
       const result = await paymentCollection.aggregate([
         {
           $unwind: '$menuItemIds'
@@ -300,8 +349,8 @@ async function run() {
         {
           $group: {
             _id: '$menuItems.category',
-            quantity:{ $sum: 1 },
-            revenue: { $sum: '$menuItems.price'} 
+            quantity: { $sum: 1 },
+            revenue: { $sum: '$menuItems.price' }
           }
         },
         {
@@ -330,11 +379,11 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send('boss is sitting')
+  res.send(`Learn Lattice is running with 0.5 meter per hours  on port ${port}`)
 })
 
 app.listen(port, () => {
-  console.log(`Bistro boss is sitting on port ${port}`);
+  console.log(`Learn Lattice is running with 0.5 meter per hours  on port ${port}`);
 })
 
 /**
