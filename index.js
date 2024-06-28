@@ -45,7 +45,7 @@ async function run() {
    
     // middlewares 
     const verifyToken = (req, res, next) => {
-      // console.log('inside verify token', req.headers.authorization);
+      // console.log('inside verify token', req.headers.authorization); 
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -160,7 +160,17 @@ async function run() {
 
     // session related apis 
     app.get('/session', async (req, res) => {
-      const result = await menuCollection.find().toArray();
+      const result = await sessionCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get('/session/:email', verifyToken, verifyTutor, async (req, res) => {
+      const email = req.params.email;
+      const query = { tutor_email:email }
+      // console.log('from session api', email)  
+      // const result = await menuCollection.findOne(query);
+      const result = await sessionCollection.find(query).toArray();
+
       res.send(result);
     });
 
