@@ -164,15 +164,27 @@ async function run() {
       res.send(result);
     });
 
+    // api for tutor only 
     app.get('/session/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
       const query = { tutor_email:email }
-      // console.log('from session api', email)  
-      // const result = await menuCollection.findOne(query);
       const result = await sessionCollection.find(query).toArray();
-
       res.send(result);
     });
+
+    app.patch('/sessionReq/:id', async (req, res) => {
+      const session = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          status:session?.status
+        }
+      }
+      const result = await sessionCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
+    
 
     app.post('/session', verifyToken, verifyTutor, async (req, res) => {
       const item = req.body;
