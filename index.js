@@ -30,8 +30,9 @@ async function run() {
     // await client.connect();
 
     const userCollection = client.db("LearnLatticeDB").collection("users");
-    const menuCollection = client.db("LearnLatticeDB").collection("menu");
     const sessionCollection = client.db("LearnLatticeDB").collection("sessions");
+    const materialCollection = client.db("LearnLatticeDB").collection("materials");
+    const menuCollection = client.db("LearnLatticeDB").collection("menu");
     const reviewCollection = client.db("LearnLatticeDB").collection("reviews");
     const cartCollection = client.db("LearnLatticeDB").collection("carts");
     const paymentCollection = client.db("LearnLatticeDB").collection("payments");
@@ -114,7 +115,7 @@ async function run() {
       const email = req.params.email;
 
       if (email !== req.decoded.email) {
-        // return res.status(403).send({ message: 'forbidden access' })
+        // return res.status(403).send({ message: 'forbidden access' })  
       }
 
       const query = { email: email };
@@ -164,13 +165,22 @@ async function run() {
       res.send(result);
     });
 
-    // api for tutor only 
+    // api for tutor only      
     app.get('/session/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
       const query = { tutor_email:email }
       const result = await sessionCollection.find(query).toArray();
       res.send(result);
     });
+
+    // for a single session 
+    app.get('/singleSession/:id', verifyToken, verifyTutor, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await sessionCollection.findOne(query);
+      console.log('from single session api ', result)
+      res.send(result);
+    })
 
     app.patch('/sessionReq/:id', async (req, res) => {
       const session = req.body;
@@ -184,13 +194,60 @@ async function run() {
       const result = await sessionCollection.updateOne(filter, updatedDoc)
       res.send(result);
     })
-    
-
+     
+ 
     app.post('/session', verifyToken, verifyTutor, async (req, res) => {
       const item = req.body;
       const result = await sessionCollection.insertOne(item);
       res.send(result);
     });
+
+    app.patch('/sessionMaterials/', verifyToken, verifyTutor, async (req, res) => {
+      const material = req.body;
+      const result = await materialCollection.insertOne(material);
+      res.send(result);
+    });
+
+    app.get('/sessionMaterials/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { sessionId: id }
+      const result = await materialCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.get('/materialsByMail/:mail', async (req, res) => {
+      const mail = req.params.mail;
+      const query = { created_by: mail }
+      const result = await materialCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.get('/material/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await materialCollection.findOne(query);
+      res.send(result);
+    })
+   
+    app.delete('/material/:id', verifyToken, verifyTutor, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await materialCollection.deleteOne(query);
+      res.send(result);
+    })
+
+    app.patch('/updateMaterial/:id', async (req, res) => {
+      const material = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          image: material.image,
+          docLink: material.docLink,
+        }
+      }
+
+      const result = await materialCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
 
     
     // menu related apis 
@@ -286,7 +343,7 @@ async function run() {
     app.get('/payments/:email', verifyToken, async (req, res) => {
       const query = { email: req.params.email }
       if (req.params.email !== req.decoded.email) {
-        // return res.status(403).send({ message: 'forbidden access' });
+        // return res.status(403).send({ message: 'forbidden access' });  
       }
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
