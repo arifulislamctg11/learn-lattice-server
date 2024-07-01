@@ -202,6 +202,42 @@ async function run() {
       res.send(result);
     });
 
+    app.patch('/sessionApprove/:id', async (req, res) => {
+      const session = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          status: session.status,
+          fee: session.fee,
+        }
+      }
+
+      const result = await sessionCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
+
+    app.patch('/sessionReject/:id', async (req, res) => {
+      const session = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          status: session.status,
+        }
+      }
+
+      const result = await sessionCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
+
+
+    app.get('/materials', async (req, res) => {
+      const result = await materialCollection.find().toArray();
+      res.send(result);
+    });
+
+
     app.patch('/sessionMaterials/', verifyToken, verifyTutor, async (req, res) => {
       const material = req.body;
       const result = await materialCollection.insertOne(material);
@@ -220,6 +256,8 @@ async function run() {
       const result = await materialCollection.find(query).toArray();
       res.send(result);
     })
+
+
     app.get('/material/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
