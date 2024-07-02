@@ -43,7 +43,7 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
       res.send({ token });
     })
-   
+
     // middlewares 
     const verifyToken = (req, res, next) => {
       // console.log('inside verify token', req.headers.authorization); 
@@ -59,7 +59,7 @@ async function run() {
         next();
       })
     }
- 
+
     // use verify admin after verifyToken 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
@@ -78,8 +78,21 @@ async function run() {
       const query = { email: email };
       const user = await userCollection.findOne(query);
       const isTutor = user?.role === 'tutor';
-      console.log('tutor : ',isTutor)
+      console.log('tutor : ', isTutor)
       if (!isTutor) {
+        // return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    }
+
+     // use verify student after verifyToken
+     const verifyStudent = async (req, res, next) => {
+      const email = req?.decoded?.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isStudent = user?.role === 'student';
+      console.log('student : ', isStudent)
+      if (!isStudent) {
         // return res.status(403).send({ message: 'forbidden access' });
       }
       next();
@@ -92,12 +105,12 @@ async function run() {
     });
 
     // checking tutor
-    app.get('/users/tutor/:email',verifyToken, verifyTutor, async (req, res) => {
+    app.get('/users/tutor/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
       console.log('inside', email);
       console.log('decoded !', req.decoded.email);
 
-      if (email !== req.decoded.email) { 
+      if (email !== req.decoded.email) {
         return res.status(403).send({ message: 'forbidden access' })
       }
 
@@ -108,6 +121,41 @@ async function run() {
         tutor = user?.role === 'tutor';
       }
       res.send({ tutor });
+    })
+
+    // student checker 
+    app.get('/users/student/:email', verifyToken, verifyStudent, async (req, res) => {
+      const email = req.params.email;
+      console.log('inside', email);
+      console.log('decoded !', req.decoded.email);
+
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      let student = false;
+      if (user) {
+        student = user?.role === 'student';
+      }
+      res.send({ student });
+    })
+
+
+    //  user role modifier 
+    app.patch('/user/role/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const user = req.body;
+      console.log(user.role)
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: user.role
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
     })
 
 
@@ -168,7 +216,7 @@ async function run() {
     // api for tutor only      
     app.get('/session/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
-      const query = { tutor_email:email }
+      const query = { tutor_email: email }
       const result = await sessionCollection.find(query).toArray();
       res.send(result);
     });
@@ -188,14 +236,14 @@ async function run() {
       const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
         $set: {
-          status:session?.status
+          status: session?.status
         }
       }
       const result = await sessionCollection.updateOne(filter, updatedDoc)
       res.send(result);
     })
-     
- 
+
+
     app.post('/session', verifyToken, verifyTutor, async (req, res) => {
       const item = req.body;
       const result = await sessionCollection.insertOne(item);
@@ -264,7 +312,7 @@ async function run() {
       const result = await materialCollection.findOne(query);
       res.send(result);
     })
-   
+
     app.delete('/material/:id', verifyToken, verifyTutor, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
@@ -287,14 +335,14 @@ async function run() {
       res.send(result);
     })
 
-    
+
     // menu related apis 
     app.get('/menu', async (req, res) => {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
 
-   
+
 
     app.get('/menu/:id', async (req, res) => {
       const id = req.params.id;
