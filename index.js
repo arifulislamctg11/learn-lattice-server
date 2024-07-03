@@ -98,6 +98,14 @@ async function run() {
       next();
     }
 
+    // tutor public apis  
+    app.get('/tutorByMail/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = {email : email}
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // users related api
     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
@@ -210,6 +218,12 @@ async function run() {
     // session related apis 
     app.get('/session', async (req, res) => {
       const result = await sessionCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get('/approvedSessions', async (req, res) => {
+      const query = {status: 'approved'}
+      const result = await sessionCollection.find(query).toArray();
       res.send(result);
     });
 
