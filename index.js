@@ -4,6 +4,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const router = express.Router();
+
 
 const port = process.env.PORT || 5000;
 
@@ -26,25 +28,27 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
-    // await client.connect();
+    // Connect the client to the server	(optional starting in v4.7) 
+    // await client.connect();  
 
     const userCollection = client.db("LearnLatticeDB").collection("users");
     const sessionCollection = client.db("LearnLatticeDB").collection("sessions");
+    const tutorsCollection = await userCollection.find({ role: "tutor" }).toArray();
+    const bookedSessionCollection = client.db("LearnLatticeDB").collection("BookedSessions");
     const materialCollection = client.db("LearnLatticeDB").collection("materials");
     const menuCollection = client.db("LearnLatticeDB").collection("menu");
     const reviewCollection = client.db("LearnLatticeDB").collection("reviews");
     const cartCollection = client.db("LearnLatticeDB").collection("carts");
     const paymentCollection = client.db("LearnLatticeDB").collection("payments");
 
-    // jwt related api
+    // jwt related api   
     app.post('/jwt', async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
       res.send({ token });
     })
 
-    // middlewares 
+    // middlewares  
     const verifyToken = (req, res, next) => {
       // console.log('inside verify token', req.headers.authorization); 
       if (!req.headers.authorization) {
@@ -72,52 +76,57 @@ async function run() {
       next();
     }
 
-    // use verify tutor after verifyToken
+    // use verify tutor after verifyToken 
     const verifyTutor = async (req, res, next) => {
       const email = req?.decoded?.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
       const isTutor = user?.role === 'tutor';
-      console.log('tutor : ', isTutor)
       if (!isTutor) {
         // return res.status(403).send({ message: 'forbidden access' });
       }
       next();
     }
 
-     // use verify student after verifyToken
-     const verifyStudent = async (req, res, next) => {
+    // use verify student after verifyToken
+    const verifyStudent = async (req, res, next) => {
       const email = req?.decoded?.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
       const isStudent = user?.role === 'student';
-      console.log('student : ', isStudent)
       if (!isStudent) {
         // return res.status(403).send({ message: 'forbidden access' });
       }
       next();
     }
 
+
+
     // tutor public apis  
     app.get('/tutorByMail/:email', async (req, res) => {
       const email = req.params.email;
-      const query = {email : email}
+      const query = { email: email }
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
 
-    // users related api
+    // users related api 
     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
     // checking tutor
+    app.get('/tutors', async (req, res) => {
+      const result = await tutorsCollection;
+      console.log(result)
+      res.send(result);
+    });
+
+
+
     app.get('/users/tutor/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
-      console.log('inside', email);
-      console.log('decoded !', req.decoded.email);
-
       if (email !== req.decoded.email) {
         return res.status(403).send({ message: 'forbidden access' })
       }
@@ -134,8 +143,6 @@ async function run() {
     // student checker 
     app.get('/users/student/:email', verifyToken, verifyStudent, async (req, res) => {
       const email = req.params.email;
-      console.log('inside', email);
-      console.log('decoded !', req.decoded.email);
 
       if (email !== req.decoded.email) {
         return res.status(403).send({ message: 'forbidden access' })
@@ -215,19 +222,44 @@ async function run() {
       res.send(result);
     })
 
-    // session related apis 
+    // session related apis  
+    app.post('/bookedSession', verifyToken, verifyTutor, async (req, res) => {
+      const item = req.body;
+      console.log('from booked Session  !', item)
+      const result = await bookedSessionCollection.insertOne(item);
+      res.send(result);
+    });
+
+    app.post('/isSessionBooked', async (req, res) => {
+      const session = req.body;
+      console.log(session)
+      const id = session.id;
+      const filter = { sessionId: id, studentEmail: session.studentEmail }
+      const result = await bookedSessionCollection.find(filter).toArray();
+      res.send(result)
+    });
+
+
+
     app.get('/session', async (req, res) => {
       const result = await sessionCollection.find().toArray();
       res.send(result);
     });
 
     app.get('/approvedSessions', async (req, res) => {
-      const query = {status: 'approved'}
+      const query = { status: 'approved' }
       const result = await sessionCollection.find(query).toArray();
       res.send(result);
     });
 
     // api for tutor only      
+    app.get('/approvedSessions', async (req, res) => {
+      const query = { status: 'approved' }
+      const result = await tutorsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
     app.get('/session/:email', verifyToken, verifyTutor, async (req, res) => {
       const email = req.params.email;
       const query = { tutor_email: email }
@@ -236,7 +268,14 @@ async function run() {
     });
 
     // for a single session 
-    app.get('/singleSession/:id', verifyToken, verifyTutor, async (req, res) => {
+    app.get('/sessionById/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await sessionCollection.findOne(query);
+      res.send(result);
+    })
+
+    app.get('/singleSession/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await sessionCollection.findOne(query);
@@ -433,9 +472,10 @@ async function run() {
         currency: 'usd',
         payment_method_types: ['card']
       });
-
+      console.log(paymentIntent.client_secret)
       res.send({
         clientSecret: paymentIntent.client_secret
+
       })
     });
 
@@ -546,6 +586,11 @@ async function run() {
 
     })
 
+     // Importing routes
+    const sessionsRouter = require('./routes/bookedSessions')(client);
+    // Using routes
+    app.use('/bookedSessions', sessionsRouter);
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected  to MongoDB!");
@@ -558,7 +603,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send(`Learn Lattice is running with 0.5 meter per hours  on port ${port}`)
+  res.send(`Learn Lattice is running with 0.5 meter per hours on port ${port}`)
 })
 
 app.listen(port, () => {
