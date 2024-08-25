@@ -6,10 +6,12 @@ module.exports = (client) => {
     const db = client.db('LearnLatticeDB'); // Replace with your database name
     const collection = db.collection('BookedSessions'); // Replace with your collection name
 
+    
+    
     router.get('/', async (req, res) => {
-        const { studentEmail } = req.query;
+        const { userEmail } = req.query;
 
-        const query = { studentEmail: studentEmail };
+        const query = { userEmail: userEmail };
         try {
             const sessions = await collection.aggregate([
                 { $match: query },
@@ -36,15 +38,27 @@ module.exports = (client) => {
                     }
                 }
             ]).toArray();
-
             res.json(sessions); // Send the sessions data as JSON 
         } catch (error) {
             res.status(500).send('Error fetching sessions');
         }
     });
 
+
+      // Route to check if a session review exists by email and sessionId
+      router.post('/isSessionBooked', async (req, res) => {
+        const { userEmail, sessionId } = req.body;
+        const query = { userEmail, sessionId };
+        const bookedSession = await collection.findOne(query);
+        if (bookedSession) {
+            res.send([ bookedSession ,true]);
+        } else {
+            res.send(false);
+        }
+    });
+
     router.get('/:id', (req, res) => {
-        res.send(`Product details for ID: ${req.params.id}`);
+        res.send(`Product  details for ID: ${req.params.id}`);
     });
 
     return router;

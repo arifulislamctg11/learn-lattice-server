@@ -36,10 +36,10 @@ async function run() {
     const tutorsCollection = await userCollection.find({ role: "tutor" }).toArray();
     const bookedSessionCollection = client.db("LearnLatticeDB").collection("BookedSessions");
     const materialCollection = client.db("LearnLatticeDB").collection("materials");
-    const menuCollection = client.db("LearnLatticeDB").collection("menu");
     const reviewCollection = client.db("LearnLatticeDB").collection("reviews");
     const cartCollection = client.db("LearnLatticeDB").collection("carts");
     const paymentCollection = client.db("LearnLatticeDB").collection("payments");
+    const menuCollection = client.db("LearnLatticeDB").collection("menu");
 
     // jwt related api   
     app.post('/jwt', async (req, res) => {
@@ -119,7 +119,7 @@ async function run() {
     // checking tutor
     app.get('/tutors', async (req, res) => {
       const result = await tutorsCollection;
-      console.log(result)
+      // console.log(result)
       res.send(result);
     });
 
@@ -162,7 +162,7 @@ async function run() {
     app.patch('/user/role/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const user = req.body;
-      console.log(user.role)
+      // console.log(user.role)
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
@@ -225,16 +225,15 @@ async function run() {
     // session related apis  
     app.post('/bookedSession', verifyToken, verifyTutor, async (req, res) => {
       const item = req.body;
-      console.log('from booked Session  !', item)
+      // console.log('from booked Session  !', item)
       const result = await bookedSessionCollection.insertOne(item);
       res.send(result);
     });
 
     app.post('/isSessionBooked', async (req, res) => {
       const session = req.body;
-      console.log(session)
       const id = session.id;
-      const filter = { sessionId: id, studentEmail: session.studentEmail }
+      const filter = { sessionId: id, userEmail: session.userEmail }
       const result = await bookedSessionCollection.find(filter).toArray();
       res.send(result)
     });
@@ -279,7 +278,7 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await sessionCollection.findOne(query);
-      console.log('from single session api ', result)
+      // console.log('from single session api ', result)
       res.send(result);
     })
 
@@ -389,51 +388,14 @@ async function run() {
     })
 
 
-    // menu related apis 
-    app.get('/menu', async (req, res) => {
-      const result = await menuCollection.find().toArray();
-      res.send(result);
-    });
 
 
 
-    app.get('/menu/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await menuCollection.findOne(query);
-      res.send(result);
-    })
 
-    app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
-      const item = req.body;
-      const result = await menuCollection.insertOne(item);
-      res.send(result);
-    });
 
-    app.patch('/menu/:id', async (req, res) => {
-      const item = req.body;
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) }
-      const updatedDoc = {
-        $set: {
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          recipe: item.recipe,
-          image: item.image
-        }
-      }
+   
 
-      const result = await menuCollection.updateOne(filter, updatedDoc)
-      res.send(result);
-    })
 
-    app.delete('/menu/:id', verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await menuCollection.deleteOne(query);
-      res.send(result);
-    })
 
     app.get('/reviews', async (req, res) => {
       const result = await reviewCollection.find().toArray();
@@ -465,14 +427,14 @@ async function run() {
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log(amount, 'amount inside the intent')
+      // console.log(amount, 'amount inside the intent')
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: 'usd',
         payment_method_types: ['card']
       });
-      console.log(paymentIntent.client_secret)
+      // console.log(paymentIntent.client_secret)
       res.send({
         clientSecret: paymentIntent.client_secret
 
@@ -494,15 +456,16 @@ async function run() {
       const paymentResult = await paymentCollection.insertOne(payment);
 
       //  carefully delete each item from the cart
-      console.log('payment info', payment);
+      // console.log('payment info', payment);
       const query = {
         _id: {
           $in: payment.cartIds.map(id => new ObjectId(id))
         }
       };
-
       const deleteResult = await cartCollection.deleteMany(query);
-
+      const {email , price ,date , sessionIds} = payment;
+      const insertDataToBookedSession = await bookedSessionCollection.insertOne( {userEmail: email, price: price, bookingDate: date, sessionId: sessionIds[0]})
+      // console.log('inserted data from line 505',insertDataToBookedSession )
       res.send({ paymentResult, deleteResult });
     })
 
@@ -588,12 +551,22 @@ async function run() {
 
      // Importing routes
     const sessionsRouter = require('./routes/bookedSessions')(client);
+    const sessionReviews = require('./routes/sessionReviews')(client);
+    const notes = require('./routes/notes')(client,verifyToken);
+    const materials = require('./routes/materials')(client,verifyToken);
+    const sessions = require('./routes/sessions')(client,verifyToken, verifyTutor);
+    const users = require('./routes/users')(client,verifyToken, verifyTutor);
     // Using routes
     app.use('/bookedSessions', sessionsRouter);
+    app.use('/sessionReviews', sessionReviews);
+    app.use('/notes', notes);
+    app.use('/materials', materials);
+    app.use('/sessions', sessions);
+    app.use('/users', users);
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected  to MongoDB!");
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
