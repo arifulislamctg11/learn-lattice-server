@@ -10,7 +10,10 @@ const router = express.Router();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+// app.use(cors());
+app.use(cors({
+  origin: [process.env.cors_origin , 'http://localhost:5000']
+}));
 app.use(express.json());
 
 
@@ -33,7 +36,7 @@ async function run() {
 
     const userCollection = client.db("LearnLatticeDB").collection("users");
     const sessionCollection = client.db("LearnLatticeDB").collection("sessions");
-    const tutorsCollection = await userCollection.find({ role: "tutor" }).toArray();
+    const tutorsCollection = userCollection.find({ role: "tutor" }).toArray();
     const bookedSessionCollection = client.db("LearnLatticeDB").collection("BookedSessions");
     const materialCollection = client.db("LearnLatticeDB").collection("materials");
     const reviewCollection = client.db("LearnLatticeDB").collection("reviews");
